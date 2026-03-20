@@ -1,0 +1,43 @@
+name: release-windows-exe
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag, for example v0.6.0-windows"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build release
+        run: cargo build --release
+
+      - name: Find exe
+        id: find_exe
+        shell: pwsh
+        run: |
+          $exe = Get-ChildItem target/release/*.exe | Select-Object -First 1
+          if (-not $exe) { throw "EXE not found in target/release" }
+          "exe_path=$($exe.FullName)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          "exe_name=$($exe.Name)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.tag }}
+          name: ${{ github.event.inputs.tag }}
+          files: ${{ steps.find_exe.outputs.exe_path }}
+          generate_release_notes: true
